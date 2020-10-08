@@ -3,42 +3,53 @@ import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 
-fun main() {
-    val width = getNum("Enter rectangle width:")
-    val height = getNum("Enter rectangle height:")
-    val fileName = getString("Enter output image name:")
+var INPUT_IMAGE = ""
+var OUTPUT_IMAGE = ""
 
-    saveImage(createImage(width, height), fileName)
+fun main(args: Array<String>) {
+    if (commandsOkay(args)) saveImage(negativeImage())
 }
 
-fun createImage(width: Int, height: Int): BufferedImage {
-    val bufferedImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
-    val g = bufferedImage.graphics
+fun commandsOkay(args: Array<String>): Boolean {
+    for (i in args.indices) {
+        val last = i == args.lastIndex
 
-    g.color = Color.red
-    g.drawLine(0, 0, width - 1, height - 1)
-    g.drawLine(width - 1, 0, 0, height - 1)
-    return bufferedImage
+        when (args[i]) {
+            "-in" -> if (last || !File(args[i + 1]).isFile) {
+                println("${args[i + 1]} is not a file.")
+                return false
+            } else INPUT_IMAGE = args[i + 1]
+            "-out" -> if (last) {
+                println("A filename was not given.")
+                return false
+            } else try {
+                File(args[i + 1]).writeText("")
+                OUTPUT_IMAGE = args[i + 1]
+            } catch (e: Exception) {
+                println(
+                    "There was an error in writing to your file. Please ensure it is not set to read only or open" +
+                            "in another program."
+                )
+            }
+        }
+    }
+    if (INPUT_IMAGE == "") println("Missing -in image filename to invert color of.")
+    if (OUTPUT_IMAGE == "") println("Missing -out filename to save the negative image.")
+    return !(INPUT_IMAGE == "" || OUTPUT_IMAGE == "")
 }
 
-fun saveImage(image: BufferedImage, file: String) = ImageIO.write(image, "png", File(file))
+fun negativeImage(): BufferedImage {
+    val bImage = ImageIO.read(File(INPUT_IMAGE))
 
-fun getNum(text: String, defaultMessage: Boolean = false): Int {
-    val strErrorNum = " was not a number, please try again: "
-    var num = text
-    var default = defaultMessage
+    for (i in 0 until bImage.width) {
+        for (j in 0 until bImage.height) {
+            var color = Color(bImage.getRGB(i, j))
 
-    do {
-        num = getString(if (default) num + strErrorNum else num)
-        if (!default) default = true
-    } while (!isNumber(num))
-
-    return num.toInt()
+            color = Color(255 - color.red, 255 - color.green, 255 - color.blue)
+            bImage.setRGB(i, j, color.rgb)
+        }
+    }
+    return bImage
 }
 
-fun getString(text: String): String {
-    println(text)
-    return readLine()!!
-}
-
-fun isNumber(number: String) = number.toIntOrNull() != null
+fun saveImage(image: BufferedImage) = ImageIO.write(image, "png", File(OUTPUT_IMAGE))
