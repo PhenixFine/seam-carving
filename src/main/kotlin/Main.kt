@@ -1,6 +1,7 @@
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.File
+import java.util.Stack
 import javax.imageio.ImageIO
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -9,7 +10,7 @@ var INPUT_IMAGE = ""
 var OUTPUT_IMAGE = ""
 
 fun main(args: Array<String>) {
-    if (commandsOkay(args)) saveImage(energy())
+    if (commandsOkay(args)) saveImage(seam())
 }
 
 fun commandsOkay(args: Array<String>): Boolean {
@@ -40,10 +41,57 @@ fun commandsOkay(args: Array<String>): Boolean {
     return !(INPUT_IMAGE == "" || OUTPUT_IMAGE == "")
 }
 
-fun energy(): BufferedImage {
+fun seam(): BufferedImage {
     val bImage = ImageIO.read(File(INPUT_IMAGE))
+    val energy = energy(bImage)
+    var lowestBottom = Double.MAX_VALUE
+    var seamTotal: Double
+    var oldSeamTotal = Double.MAX_VALUE
+    val stack = Stack<Int>()
+    val oldStack = Stack<Int>()
+    val jLast = energy[0].lastIndex
+    val iLast = energy.lastIndex
+    val setRed = { i: Int, j: Int -> bImage.setRGB(i, j, Color(255, 0, 0).rgb) }
+
+    for (j in 1..jLast) {
+        for (i in 0..iLast) {
+            var add = energy[i][j - 1]
+            if (i != 0 && energy[i - 1][j - 1] < add) add = energy[i - 1][j - 1]
+            if (i != iLast && energy[i + 1][j - 1] < add) add = energy[i + 1][j - 1]
+            energy[i][j] += add
+            if (j == jLast && energy[i][j] < lowestBottom) lowestBottom = energy[i][j]
+        }
+    }
+
+    for (i in 0..energy.lastIndex) {
+        if (energy[i][jLast] == lowestBottom) {
+            stack.push(i)
+            seamTotal = energy[i][jLast]
+            var index = i
+            for (j in jLast - 1 downTo 0) {
+                var lowIndex = index
+                if (index != 0 && energy[index - 1][j] < energy[index][j]) lowIndex -= 1
+                if (index != iLast && energy[index + 1][j] < energy[lowIndex][j]) lowIndex = index + 1
+                index = lowIndex
+                stack.push(index)
+                seamTotal += energy[index][j]
+            }
+            if (seamTotal < oldSeamTotal) {
+                if (oldStack.isNotEmpty()) oldStack.clear()
+                oldSeamTotal = seamTotal
+                oldStack.addAll(stack)
+            }
+            stack.clear()
+        }
+    }
+
+    for (j in 0..jLast) setRed(oldStack.pop(), j)
+
+    return bImage
+}
+
+fun energy(bImage: BufferedImage): Array<Array<Double>> {
     val energy = Array(bImage.width) { Array(bImage.height) { 0.0 } }
-    var maxEnergy = 0.0
 
     for (i in 0 until bImage.width) {
         for (j in 0 until bImage.height) {
@@ -58,19 +106,11 @@ fun energy(): BufferedImage {
             val yDif = (up.red.toDouble() - down.red).pow(2) +
                     (up.green.toDouble() - down.green).pow(2) + (up.blue.toDouble() - down.blue).pow(2)
             val energyNum = sqrt(xDif + yDif)
-
-            if (energyNum > maxEnergy) maxEnergy = energyNum
             energy[i][j] = energyNum
         }
     }
-    for (i in 0 until bImage.width) {
-        for (j in 0 until bImage.height) {
-            val intensity = (255.0 * energy[i][j] / maxEnergy).toInt()
-            val color = Color(intensity, intensity, intensity)
-            bImage.setRGB(i, j, color.rgb)
-        }
-    }
-    return bImage
+
+    return energy
 }
 
 fun saveImage(image: BufferedImage) = ImageIO.write(image, "png", File(OUTPUT_IMAGE))
