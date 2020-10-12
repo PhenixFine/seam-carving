@@ -10,7 +10,7 @@ var INPUT_IMAGE = ""
 var OUTPUT_IMAGE = ""
 
 fun main(args: Array<String>) {
-    if (commandsOkay(args)) saveImage(seam())
+    if (commandsOkay(args)) saveImage(seamHorizontal())
 }
 
 fun commandsOkay(args: Array<String>): Boolean {
@@ -41,8 +41,9 @@ fun commandsOkay(args: Array<String>): Boolean {
     return !(INPUT_IMAGE == "" || OUTPUT_IMAGE == "")
 }
 
-fun seam(): BufferedImage {
-    val bImage = ImageIO.read(File(INPUT_IMAGE))
+fun seamHorizontal() = rotateImage(seam(rotateImage(ImageIO.read(File(INPUT_IMAGE)))))
+
+fun seam(bImage: BufferedImage = ImageIO.read(File(INPUT_IMAGE))): BufferedImage {
     val energy = energy(bImage)
     var lowestBottom = Double.MAX_VALUE
     var seamTotal: Double
@@ -111,6 +112,16 @@ fun energy(bImage: BufferedImage): Array<Array<Double>> {
     }
 
     return energy
+}
+
+fun rotateImage(bImage: BufferedImage): BufferedImage {
+    val bImage2 = BufferedImage(bImage.height, bImage.width, BufferedImage.TYPE_INT_RGB)
+
+    for (i in 0 until bImage.width) {
+        for (j in 0 until bImage.height) bImage2.setRGB(j, i, Color(bImage.getRGB(i, j)).rgb)
+    }
+
+    return bImage2
 }
 
 fun saveImage(image: BufferedImage) = ImageIO.write(image, "png", File(OUTPUT_IMAGE))
