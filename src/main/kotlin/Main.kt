@@ -8,15 +8,16 @@ import kotlin.math.sqrt
 
 var INPUT_IMAGE = ""
 var OUTPUT_IMAGE = ""
+var WIDTH = -1
+var HEIGHT = -1
 
 fun main(args: Array<String>) {
-    if (commandsOkay(args)) saveImage(seamHorizontal())
+    if (commandsOkay(args)) saveImage(removePixels())
 }
 
 fun commandsOkay(args: Array<String>): Boolean {
     for (i in args.indices) {
         val last = i == args.lastIndex
-
         when (args[i]) {
             "-in" -> if (last || !File(args[i + 1]).isFile) {
                 println("${args[i + 1]} is not a file.")
@@ -34,16 +35,43 @@ fun commandsOkay(args: Array<String>): Boolean {
                             "in another program."
                 )
             }
+            "-width" -> if (!last && args[i + 1].toIntOrNull() != null) WIDTH = args[i + 1].toInt() else {
+                println("No width was given.")
+                return false
+            }
+            "-height" -> if (!last && args[i + 1].toIntOrNull() != null) HEIGHT = args[i + 1].toInt() else {
+                println("No height was given.")
+                return false
+            }
         }
     }
+
+    if (WIDTH == -1 && HEIGHT == -1) println("No numbers set for height and width.")
     if (INPUT_IMAGE == "") println("Missing -in image filename to invert color of.")
     if (OUTPUT_IMAGE == "") println("Missing -out filename to save the negative image.")
-    return !(INPUT_IMAGE == "" || OUTPUT_IMAGE == "")
+
+    return !(INPUT_IMAGE == "" || OUTPUT_IMAGE == "" || (WIDTH == -1 && HEIGHT == -1))
 }
 
-fun seamHorizontal() = rotateImage(seam(rotateImage(ImageIO.read(File(INPUT_IMAGE)))))
+fun removePixels(): BufferedImage {
+    var bImage = ImageIO.read(File(INPUT_IMAGE))
 
-fun seam(bImage: BufferedImage = ImageIO.read(File(INPUT_IMAGE))): BufferedImage {
+    if (WIDTH > 0) repeat(WIDTH) {
+        bImage = seam(bImage)
+    }
+    if (HEIGHT > 0) {
+        bImage = rotateImage(bImage)
+        repeat(HEIGHT) {
+            bImage = seam(bImage)
+        }
+        bImage = rotateImage(bImage)
+    }
+
+    return bImage
+}
+
+fun seam(bImage: BufferedImage): BufferedImage {
+    val imageSeam = BufferedImage(bImage.width - 1, bImage.height, BufferedImage.TYPE_INT_RGB)
     val energy = energy(bImage)
     var lowestBottom = Double.MAX_VALUE
     var seamTotal: Double
@@ -52,7 +80,6 @@ fun seam(bImage: BufferedImage = ImageIO.read(File(INPUT_IMAGE))): BufferedImage
     val oldStack = Stack<Int>()
     val jLast = energy[0].lastIndex
     val iLast = energy.lastIndex
-    val setRed = { i: Int, j: Int -> bImage.setRGB(i, j, Color(255, 0, 0).rgb) }
 
     for (j in 1..jLast) {
         for (i in 0..iLast) {
@@ -86,9 +113,18 @@ fun seam(bImage: BufferedImage = ImageIO.read(File(INPUT_IMAGE))): BufferedImage
         }
     }
 
-    for (j in 0..jLast) setRed(oldStack.pop(), j)
+    for (j in 0..jLast) {
+        val skipNum = oldStack.pop()
+        var skip = false
+        for (i in 0..iLast) {
+            if (i == skipNum) skip = true else {
+                val color = Color(bImage.getRGB(i, j))
+                if (skip) imageSeam.setRGB(i - 1, j, color.rgb) else imageSeam.setRGB(i, j, color.rgb)
+            }
+        }
+    }
 
-    return bImage
+    return imageSeam
 }
 
 fun energy(bImage: BufferedImage): Array<Array<Double>> {
